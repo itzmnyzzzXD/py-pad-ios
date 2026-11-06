@@ -7,13 +7,22 @@ on:
   workflow_dispatch:
     inputs:
       offline_python:
-        description: "Bundle Python (Pyodide) inside the app so it works offline (adds ~300 MB)"
+        description: "Bundle Python (Pyodide) inside the app so it works offline (adds about 300 MB)"
         type: boolean
+        required: false
         default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: pypad-build-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: macos-latest
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -22,7 +31,7 @@ jobs:
         run: bash scripts/vendor.sh
 
       - name: Vendor Pyodide (optional, offline Python)
-        if: ${{ github.event.inputs.offline_python == 'true' }}
+        if: ${{ inputs.offline_python }}
         shell: bash
         run: bash scripts/vendor-pyodide.sh
 
@@ -32,11 +41,13 @@ jobs:
 
       - name: Generate Xcode project
         shell: bash
-        run: xcodegen generate
+        run: xcodegen generate --spec project.yml
 
       - name: Build unsigned archive
         shell: bash
         run: |
+          set -o pipefail
+          mkdir -p build
           xcodebuild \
             -project PyPad.xcodeproj \
             -scheme PyPad \
@@ -45,26 +56,34 @@ jobs:
             -destination "generic/platform=iOS" \
             -archivePath "$PWD/build/PyPad.xcarchive" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            archive 2>&1 | tail -n 60
+            archive 2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" | tail -n 80
 
-      - name: Package IPA
+      - name: Package unsigned IPA
         shell: bash
         run: |
+          set -euo pipefail
           APP="build/PyPad.xcarchive/Products/Applications/PyPad.app"
-          test -d "$APP" || { echo "Build failed: no .app produced"; exit 1; }
+          test -d "$APP" || { echo "Build failed: no PyPad.app was produced"; exit 1; }
+          test -f "$APP/Info.plist" || { echo "Build failed: app Info.plist is missing"; exit 1; }
           rm -rf Payload PyPad.ipa
-          mkdir Payload
+          mkdir -p Payload
           cp -R "$APP" Payload/
-          zip -qry PyPad.ipa Payload
+          /usr/bin/zip -qry PyPad.ipa Payload
+          /usr/bin/zip -T PyPad.ipa
+          test -s PyPad.ipa
+          unzip -l PyPad.ipa | grep -q "Payload/PyPad.app/Info.plist"
 
       - name: Upload IPA
         uses: actions/upload-artifact@v4
         with:
           name: PyPad-ipa
           path: PyPad.ipa
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Attach to release (tags only)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: PyPad.ipa
+          fail_on_unmatched_files: true
