@@ -1,0 +1,70 @@
+name: Build IPA
+
+on:
+  push:
+    branches: [main, master]
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      offline_python:
+        description: "Bundle Python (Pyodide) inside the app so it works offline (adds ~300 MB)"
+        type: boolean
+        default: false
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Vendor editor libraries (offline editor)
+        shell: bash
+        run: bash scripts/vendor.sh
+
+      - name: Vendor Pyodide (optional, offline Python)
+        if: ${{ github.event.inputs.offline_python == 'true' }}
+        shell: bash
+        run: bash scripts/vendor-pyodide.sh
+
+      - name: Install XcodeGen
+        shell: bash
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        shell: bash
+        run: xcodegen generate
+
+      - name: Build unsigned archive
+        shell: bash
+        run: |
+          xcodebuild \
+            -project PyPad.xcodeproj \
+            -scheme PyPad \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -archivePath "$PWD/build/PyPad.xcarchive" \
+            CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
+            archive 2>&1 | tail -n 60
+
+      - name: Package IPA
+        shell: bash
+        run: |
+          APP="build/PyPad.xcarchive/Products/Applications/PyPad.app"
+          test -d "$APP" || { echo "Build failed: no .app produced"; exit 1; }
+          rm -rf Payload PyPad.ipa
+          mkdir Payload
+          cp -R "$APP" Payload/
+          zip -qry PyPad.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: PyPad-ipa
+          path: PyPad.ipa
+
+      - name: Attach to release (tags only)
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: PyPad.ipa
