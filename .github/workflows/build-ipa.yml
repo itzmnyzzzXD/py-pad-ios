@@ -38,6 +38,10 @@ jobs:
         shell: bash
         run: bash scripts/check-source.sh
 
+      - name: Smoke-test bundled Python runtime
+        shell: bash
+        run: node scripts/smoke-python.mjs
+
       - name: Install XcodeGen
         shell: bash
         run: brew install xcodegen
@@ -69,7 +73,7 @@ jobs:
           RUNTIME="$APP/Web/vendor/pyodide"
           test -d "$APP"
           test -s "$APP/Info.plist"
-          for file in pyodide.js pyodide.asm.js pyodide.asm.wasm python_stdlib.zip pyodide-lock.json; do
+          for file in pyodide.js pyodide.mjs pyodide.asm.js pyodide.asm.wasm python_stdlib.zip pyodide-lock.json; do
             test -s "$RUNTIME/$file" || { echo "Missing bundled Python file: $file"; exit 1; }
           done
           SIZE_KB="$(du -sk "$RUNTIME" | awk '{print $1}')"
@@ -88,6 +92,7 @@ jobs:
           /usr/bin/zip -qry PyPad.ipa Payload
           /usr/bin/zip -T PyPad.ipa
           unzip -Z1 PyPad.ipa > "$RUNNER_TEMP/ipa-files.txt"
+          grep -Fq 'Payload/PyPad.app/Web/vendor/pyodide/pyodide.mjs' "$RUNNER_TEMP/ipa-files.txt"
           grep -Fq 'Payload/PyPad.app/Web/vendor/pyodide/pyodide.asm.wasm' "$RUNNER_TEMP/ipa-files.txt"
           grep -Fq 'Payload/PyPad.app/Web/vendor/pyodide/pyodide-lock.json' "$RUNNER_TEMP/ipa-files.txt"
           test -s PyPad.ipa

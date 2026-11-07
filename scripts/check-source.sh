@@ -6,6 +6,7 @@ cd "$ROOT"
 for file in Web/js/*.js; do
   node --check "$file"
 done
+node --check scripts/smoke-python.mjs
 
 python3 - <<'PY'
 from pathlib import Path
