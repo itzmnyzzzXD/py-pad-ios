@@ -154,7 +154,7 @@ const UI = {
   /* ───── sidebar ───── */
   sbSwitch(name) {
     this.sbTab = name;
-    $('#sbTabs button').forEach(b => b.classList.toggle('on', b.dataset.sb === name));
+    $$('#sbTabs button').forEach(b => b.classList.toggle('on', b.dataset.sb === name));
     if (name === 'files') this.renderFiles(); else if (name === 'pkgs') this.renderPkgs(); else if (name === 'ext') this.renderExtensions(); else this.renderTpl();
   },
   sbClick(e) {
