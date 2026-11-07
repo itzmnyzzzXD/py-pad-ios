@@ -16,6 +16,7 @@ const Run = {
     await WS.flush();
     haptic('medium');
     const ext = Path.ext(p), code = WS.files[p] || '';
+    if (await ExtensionManager.runFile(p)) return;
     if (ext === 'py') {
       UI.showOut('term');
       if (!Prefs.get('keepOutput')) Con.clear();

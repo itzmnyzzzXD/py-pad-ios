@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="color-scheme" content="dark">
-<title>PyPad</title>
+<title>PyPad IDE</title>
 <link rel="stylesheet" href="css/app.css">
 </head>
 <body>
@@ -45,6 +45,7 @@
 
   <header id="top">
     <button class="ib" id="btnMenu" title="Files (⌘B)"><svg class="i"><use href="#i-menu"/></svg></button>
+    <button class="ib" id="btnHome" title="Home"><svg class="i"><use href="#i-layers"/></svg></button>
     <div class="brand"><span class="logo">&gt;_</span><span class="bname">PyPad</span></div>
     <div class="spacer"></div>
     <button class="ib" id="btnPanel" title="Toggle output (⌘J)"><svg class="i"><use href="#i-panel"/></svg></button>
@@ -58,12 +59,36 @@
         <button data-sb="files" class="on">Files</button>
         <button data-sb="pkgs">Packages</button>
         <button data-sb="tpl">Templates</button>
+        <button data-sb="ext">Extensions</button>
       </div>
       <div class="sb-body" id="sbBody"></div>
     </aside>
     <div id="scrim"></div>
 
-    <section id="work">
+    <section id="work" data-screen="home">
+      <section id="homeScreen" class="home-screen">
+        <div class="home-page">
+          <div class="home-kicker"><span class="home-mark">&gt;_</span> PY PAD / DEVELOPMENT WORKSPACE</div>
+          <div class="home-hero"><div>
+            <h1>Build something<br><span>worth shipping.</span></h1>
+            <p>A focused Python and web IDE for iPad. Your projects stay in your workspace, and Python runs in the app through WebAssembly.</p>
+          </div><div class="home-actions">
+            <button class="home-primary" data-home="new">＋ New Python file</button>
+            <button class="home-secondary" data-home="templates">Browse templates</button>
+            <button class="home-secondary" data-home="import">Import files</button>
+          </div></div>
+          <div class="home-grid">
+            <section class="home-card"><div class="home-section-head"><div><span class="home-label">WORKSPACE</span><h2>Recent files</h2></div><button class="home-link" data-home="files">View files →</button></div><div id="homeRecent" class="home-recent"></div></section>
+            <section class="home-card"><div class="home-section-head"><div><span class="home-label">GET STARTED</span><h2>Start with a project</h2></div></div><div class="home-starters">
+              <button data-template="py-hello"><span class="starter-icon py">PY</span><span><b>Python project</b><small>Scripts, input, files and packages</small></span><span class="starter-arrow">↗</span></button>
+              <button data-template="py-data"><span class="starter-icon data">01</span><span><b>Data workspace</b><small>NumPy, pandas and charts</small></span><span class="starter-arrow">↗</span></button>
+              <button data-template="web"><span class="starter-icon web">WEB</span><span><b>Web project</b><small>HTML, CSS, JavaScript preview</small></span><span class="starter-arrow">↗</span></button>
+              <button data-template="flask"><span class="starter-icon flask">API</span><span><b>Python web app</b><small>Routes and local preview</small></span><span class="starter-arrow">↗</span></button>
+            </div></section>
+          </div>
+          <div class="home-footer"><span><i></i> Local workspace</span><span>Python · JavaScript · HTML · CSS</span><button data-home="extensions">Explore extensions →</button></div>
+        </div>
+      </section>
       <div id="tabs"></div>
       <div id="split">
         <div id="editorPane">
@@ -75,7 +100,6 @@
           <div id="outTabs">
             <button data-out="term" class="on"><svg class="i"><use href="#i-terminal"/></svg><span>Terminal</span></button>
             <button data-out="prev"><svg class="i"><use href="#i-eye"/></svg><span>Preview</span></button>
-            <button data-out="disc"><svg class="i"><use href="#i-chat"/></svg><span>Discord</span></button>
             <div class="spacer"></div>
             <button class="ib sm" id="btnClear" title="Clear (⌘K)"><svg class="i"><use href="#i-trash"/></svg></button>
           </div>
@@ -95,17 +119,7 @@
               <iframe id="pvFrame" sandbox="allow-scripts allow-forms allow-modals allow-popups allow-pointer-lock allow-downloads"></iframe>
               <div id="pvEmpty" class="empty"><b>No preview yet</b><span>Run an .html file, or run a Flask app (<code>app.run()</code>).</span></div>
             </div>
-            <div class="panel" id="p-disc">
-              <div class="dc-head">
-                <div><b id="dcTitle">Discord simulator</b><small id="dcSub">Run a bot with <code>bot.run(TOKEN)</code></small></div>
-                <select id="dcChan"><option>#general</option><option>#bot-commands</option></select>
-              </div>
-              <div id="dcMsgs"></div>
-              <form id="dcForm" autocomplete="off">
-                <input id="dcIn" autocapitalize="none" autocorrect="off" spellcheck="false" placeholder="Message #general — try !ping or /hello">
-                <button class="run sm" type="submit">Send</button>
-              </form>
-            </div>
+            
           </div>
         </div>
       </div>
@@ -127,6 +141,7 @@
 <script src="js/editor.js"></script>
 <script src="js/python.js"></script>
 <script src="js/runners.js"></script>
+<script src="js/extensions.js"></script>
 <script src="js/shell.js"></script>
 <script src="js/ui.js"></script>
 <script src="js/cursor.js"></script>

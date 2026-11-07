@@ -1,37 +1,36 @@
-name: Build IPA
+name: Build PyPad iOS IPA
 
 on:
   push:
     branches: [main, master]
     tags: ["v*"]
   workflow_dispatch:
-    inputs:
-      offline_python:
-        description: "Bundle Python (Pyodide) inside the app so it works offline (adds about 300 MB)"
-        type: boolean
-        required: false
-        default: false
 
 permissions:
   contents: write
 
 concurrency:
-  group: pypad-build-${{ github.ref }}
+  group: pypad-ios-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
   build:
     runs-on: macos-latest
-    timeout-minutes: 45
+    timeout-minutes: 90
     steps:
       - uses: actions/checkout@v4
 
-      - name: Vendor editor libraries (offline editor)
+      - name: Cache full Pyodide runtime
+        uses: actions/cache@v4
+        with:
+          path: Web/vendor/pyodide
+          key: pyodide-0.26.4-full-ios-v1
+
+      - name: Vendor editor libraries
         shell: bash
         run: bash scripts/vendor.sh
 
-      - name: Vendor Pyodide (optional, offline Python)
-        if: ${{ inputs.offline_python }}
+      - name: Vendor and verify full Python runtime
         shell: bash
         run: bash scripts/vendor-pyodide.sh
 
@@ -43,7 +42,7 @@ jobs:
         shell: bash
         run: xcodegen generate --spec project.yml
 
-      - name: Build unsigned archive
+      - name: Build unsigned iOS archive
         shell: bash
         run: |
           set -o pipefail
@@ -56,32 +55,48 @@ jobs:
             -destination "generic/platform=iOS" \
             -archivePath "$PWD/build/PyPad.xcarchive" \
             CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY="" \
-            archive 2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" | tail -n 80
+            archive 2>&1 | tee "$RUNNER_TEMP/xcodebuild.log" | tail -n 100
 
-      - name: Package unsigned IPA
+      - name: Verify app embeds Python
         shell: bash
         run: |
           set -euo pipefail
           APP="build/PyPad.xcarchive/Products/Applications/PyPad.app"
-          test -d "$APP" || { echo "Build failed: no PyPad.app was produced"; exit 1; }
-          test -f "$APP/Info.plist" || { echo "Build failed: app Info.plist is missing"; exit 1; }
+          RUNTIME="$APP/Web/vendor/pyodide"
+          test -d "$APP"
+          test -s "$APP/Info.plist"
+          for file in pyodide.js pyodide.asm.js pyodide.asm.wasm python_stdlib.zip pyodide-lock.json; do
+            test -s "$RUNTIME/$file" || { echo "Missing bundled Python file: $file"; exit 1; }
+          done
+          SIZE_KB="$(du -sk "$RUNTIME" | awk '{print $1}')"
+          test "$SIZE_KB" -gt 100000
+          find "$RUNTIME" -maxdepth 1 -type f -name '*.whl' | grep -q .
+          echo "Embedded Python size: $(du -sh "$RUNTIME" | cut -f1)"
+
+      - name: Package and validate unsigned IPA
+        shell: bash
+        run: |
+          set -euo pipefail
+          APP="build/PyPad.xcarchive/Products/Applications/PyPad.app"
           rm -rf Payload PyPad.ipa
           mkdir -p Payload
           cp -R "$APP" Payload/
           /usr/bin/zip -qry PyPad.ipa Payload
           /usr/bin/zip -T PyPad.ipa
+          unzip -l PyPad.ipa | grep -q 'Payload/PyPad.app/Web/vendor/pyodide/pyodide.asm.wasm'
+          unzip -l PyPad.ipa | grep -q 'Payload/PyPad.app/Web/vendor/pyodide/pyodide-lock.json'
           test -s PyPad.ipa
-          unzip -l PyPad.ipa | grep -q "Payload/PyPad.app/Info.plist"
+          ls -lh PyPad.ipa
 
-      - name: Upload IPA
+      - name: Upload unsigned IPA
         uses: actions/upload-artifact@v4
         with:
-          name: PyPad-ipa
+          name: PyPad-unsigned-ipa
           path: PyPad.ipa
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 30
 
-      - name: Attach to release (tags only)
+      - name: Attach IPA to version release
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:

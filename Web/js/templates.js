@@ -113,67 +113,6 @@ a{color:#59c2ff}
     }
   },
   {
-    id: 'discord', name: 'Discord bot', emoji: '🤖', folder: 'discord-bot', main: 'bot.py',
-    desc: 'discord.py style bot. Test commands in the built-in simulator.',
-    files: {
-      'bot.py': String.raw`import random
-import discord
-from discord.ext import commands
-
-intents = discord.Intents.default()
-intents.message_content = True
-bot = commands.Bot(command_prefix="!", intents=intents)
-
-
-@bot.event
-async def on_ready():
-    print(f"Logged in as {bot.user}")
-
-
-@bot.command(help="Replies with Pong")
-async def ping(ctx):
-    await ctx.send("Pong! 🏓")
-
-
-@bot.command(help="Roll a die: !roll 20")
-async def roll(ctx, sides: int = 6):
-    await ctx.send(f"🎲 You rolled a **{random.randint(1, sides)}** (d{sides})")
-
-
-@bot.command(help="Add numbers: !add 2 3 4")
-async def add(ctx, *numbers: float):
-    await ctx.send(f"Sum = {sum(numbers):g}")
-
-
-@bot.command(help="Show an embed")
-async def about(ctx):
-    e = discord.Embed(title="PyPad Bot", description="Running inside PyPad", color=discord.Color.blurple())
-    e.add_field(name="Library", value="discord.py-compatible")
-    e.add_field(name="Where", value="your iPad", inline=True)
-    e.set_footer(text="Simulated Discord")
-    await ctx.send(embed=e)
-
-
-@bot.tree.command(name="hello", description="Say hello")
-async def hello(interaction: discord.Interaction):
-    await interaction.response.send_message(f"Hey {interaction.user.mention}!")
-
-
-@bot.event
-async def on_message(message):
-    if message.author.bot:
-        return
-    if "good bot" in message.content.lower():
-        await message.add_reaction("❤️")
-    await bot.process_commands(message)
-
-
-# Real token goes here when you deploy this file to a server.
-bot.run("YOUR_TOKEN_HERE")
-`
-    }
-  },
-  {
     id: 'web', name: 'Website (HTML/CSS/JS)', emoji: '🌐', folder: 'website', main: 'index.html',
     desc: 'Three linked files. Preview inlines them automatically.',
     files: {
@@ -274,7 +213,7 @@ addEventListener("pointermove", move); addEventListener("touchmove", move);
   }
 ];
 
-const SEED_IDS = ['py-hello', 'py-data', 'flask', 'discord', 'web', 'js'];
+const SEED_IDS = ['py-hello', 'py-data', 'flask', 'web', 'js'];
 
 async function instantiateTemplate(t) {
   const folder = WS.uniquePath(t.folder);

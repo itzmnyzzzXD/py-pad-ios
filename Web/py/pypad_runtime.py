@@ -124,7 +124,7 @@ def prepare(ws_root, cwd):
         if f and isinstance(f, str) and f.startswith(ws_root):
             sys.modules.pop(name, None)
     importlib.invalidate_caches()
-    for shim in ("flask", "discord"):
+    for shim in ("flask",):
         m = sys.modules.get(shim)
         if m is not None and hasattr(m, "_reset"):
             try:

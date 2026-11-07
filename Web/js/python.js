@@ -1,8 +1,7 @@
 'use strict';
 const PY_VERSION = '0.26.4';
-const PY_CDN = 'https://cdn.jsdelivr.net/pyodide/v' + PY_VERSION + '/full/';
 const PY_HOME = '/home/pyodide', WS_ROOT = PY_HOME + '/ws', RT_ROOT = PY_HOME + '/_pypad';
-const PY_FILES = ['pypad_runtime.py', 'flask.py', 'discord/__init__.py', 'discord/ext/__init__.py', 'discord/ext/commands.py', 'discord/ext/tasks.py', 'discord/utils.py', 'discord/app_commands.py'];
+const PY_FILES = ['pypad_runtime.py', 'flask.py'];
 
 // import-name -> distribution name
 const PY_ALIAS = {
@@ -26,7 +25,7 @@ const PKG_CATALOG = [
     ['click', 'CLIs'], ['rich', 'Pretty terminal output'], ['tqdm', 'Progress bars'], ['tabulate', 'Pretty tables'], ['python-dateutil', 'Date parsing'],
     ['pytz', 'Time zones'], ['openpyxl', 'Excel files'], ['cryptography', 'Crypto primitives'], ['pycryptodome', 'Crypto (Crypto)'], ['jsonschema', 'JSON Schema'],
     ['msgpack', 'MessagePack'], ['toolz', 'Functional helpers'], ['more-itertools', 'Itertools extras'], ['faker', 'Fake data'], ['colorama', 'Terminal colors'], ['emoji', 'Emoji helpers']] },
-  { g: 'Built in (this app)', items: [['flask', 'Flask-compatible web framework, runs in Preview'], ['discord', 'discord.py-compatible, runs in the simulator']] }
+  { g: 'Built in (this app)', items: [['flask', 'Flask-compatible web framework, runs in Preview']] }
 ];
 
 const Py = {
@@ -39,13 +38,18 @@ const Py = {
   },
 
   async _init() {
-    Con.sys('Starting Python… (first launch downloads the runtime, later launches are cached)');
-    let base = PY_CDN;
-    try { const r = await fetch('vendor/pyodide/pyodide.js', { method: 'HEAD' }); if (r.ok) base = new URL('vendor/pyodide/', document.baseURI).href; } catch (e) {}
+    Con.sys('Loading bundled Python runtime (Pyodide ' + PY_VERSION + ')…');
+    const base = new URL('vendor/pyodide/', document.baseURI).href;
+    const required = ['pyodide.js', 'pyodide.asm.js', 'pyodide.asm.wasm', 'python_stdlib.zip', 'pyodide-lock.json'];
+    for (const file of required) {
+      const response = await fetch(base + file, { method: 'HEAD' });
+      if (!response.ok) throw new Error('Bundled Python runtime is incomplete: missing ' + file + '. Rebuild PyPad with the full Pyodide distribution.');
+    }
     await loadScript(base + 'pyodide.js');
     const py = this.py = await loadPyodide({ indexURL: base, stdout: s => Con.out(s), stderr: s => Con.err(s) });
     py.setStdin({ stdin: () => null });
-    try { await py.loadPackage(['micropip', 'pyodide-http'], { messageCallback: () => {}, errorCallback: () => {} }); } catch (e) { Con.warn('micropip unavailable: ' + e.message); }
+    try { await py.loadPackage('micropip', { messageCallback: () => {}, errorCallback: () => {} }); } catch (e) { Con.warn('Package installer unavailable: ' + e.message); }
+    try { await py.loadPackage('pyodide-http', { messageCallback: () => {}, errorCallback: () => {} }); } catch (e) { Con.warn('HTTP compatibility helper unavailable; browser network restrictions still apply.'); }
     py.FS.mkdirTree(RT_ROOT + '/discord/ext'); py.FS.mkdirTree(WS_ROOT);
     for (const f of PY_FILES) {
       const r = await fetch('py/' + f); if (!r.ok) throw new Error('Missing runtime file ' + f);
@@ -113,7 +117,7 @@ const Py = {
   /* ── packages ── */
   isLoaded(dist) {
     const norm = s => s.toLowerCase().replace(/[-_.]+/g, '-');
-    if (dist === 'flask' || dist === 'discord') return true;
+    if (dist === 'flask') return true;
     if (!this.py) return false;
     return Object.keys(this.py.loadedPackages).some(k => norm(k) === norm(dist));
   },

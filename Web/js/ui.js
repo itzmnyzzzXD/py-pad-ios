@@ -14,8 +14,19 @@ const UI = {
     this.app = $('#app');
     this.app.dataset.sb = innerWidth >= 900 ? 'open' : 'closed';
     this.app.dataset.view = 'code';
+    $('#work').dataset.screen = 'home';
     // header
     $('#btnMenu').addEventListener('click', () => this.toggleSidebar());
+    $('#btnHome').addEventListener('click', () => this.showHome());
+    $('#homeScreen').addEventListener('click', e => {
+      const b = e.target.closest('[data-home],[data-template]'); if (!b) return;
+      if (b.dataset.template) this.useTemplate(b.dataset.template);
+      else if (b.dataset.home === 'new') this.newFile('');
+      else if (b.dataset.home === 'templates') { this.toggleSidebar(true); this.sbSwitch('tpl'); }
+      else if (b.dataset.home === 'import') this.importFiles('');
+      else if (b.dataset.home === 'files') { this.toggleSidebar(true); this.sbSwitch('files'); }
+      else if (b.dataset.home === 'extensions') { this.toggleSidebar(true); this.sbSwitch('ext'); }
+    });
     $('#scrim').addEventListener('click', () => this.toggleSidebar(false));
     $('#btnPanel').addEventListener('click', () => this.toggleOut());
     $('#btnSettings').addEventListener('click', () => this.settings());
@@ -45,6 +56,28 @@ const UI = {
   },
 
   updateEmpty() { const e = $('#edEmpty'); if (e) e.style.display = Ed.tabs.length ? 'none' : 'flex'; },
+
+  /* ───── layout ───── */
+  setScreen(screen) {
+    $('#work').dataset.screen = screen;
+    if (screen === 'home') this.renderHome();
+    setTimeout(() => Ed.refresh(), 30);
+  },
+  showHome() { this.setScreen('home'); },
+  renderHome() {
+    const recent = [], last = localStorage.getItem('pypad.last');
+    if (last && last in WS.files && !WS.isBinary(last)) recent.push(last);
+    for (const p of Object.keys(WS.files).reverse()) {
+      if (recent.includes(p) || WS.isBinary(p) || !/^(py|js|mjs|html|htm|css|md|json|csv)$/i.test(Path.ext(p))) continue;
+      recent.push(p); if (recent.length >= 6) break;
+    }
+    const host = $('#homeRecent');
+    host.innerHTML = recent.length ? recent.map(p => {
+      const ext = Path.ext(p).toUpperCase() || 'FILE';
+      return `<button class="recent-file" data-recent="${esc(p)}"><span class="recent-ext ${esc(Path.ext(p))}">${esc(ext.slice(0,4))}</span><span class="recent-name"><b>${esc(Path.base(p))}</b><small>${esc(Path.dir(p) || 'Workspace')}</small></span><span class="recent-open">Open ↗</span></button>`;
+    }).join('') : '<div class="home-empty"><b>Your workspace is ready.</b><span>Create a Python file or start from a project template.</span></div>';
+    host.querySelectorAll('[data-recent]').forEach(b => b.addEventListener('click', () => this.openFile(b.dataset.recent)));
+  },
 
   /* ───── layout ───── */
   setView(v) {
@@ -121,8 +154,8 @@ const UI = {
   /* ───── sidebar ───── */
   sbSwitch(name) {
     this.sbTab = name;
-    $$('#sbTabs button').forEach(b => b.classList.toggle('on', b.dataset.sb === name));
-    if (name === 'files') this.renderFiles(); else if (name === 'pkgs') this.renderPkgs(); else this.renderTpl();
+    $('#sbTabs button').forEach(b => b.classList.toggle('on', b.dataset.sb === name));
+    if (name === 'files') this.renderFiles(); else if (name === 'pkgs') this.renderPkgs(); else if (name === 'ext') this.renderExtensions(); else this.renderTpl();
   },
   sbClick(e) {
     const t = e.target;
@@ -134,6 +167,7 @@ const UI = {
       else if (a === 'install') this.pkgInstall(act.dataset.pkg, act);
       else if (a === 'pipgo') { const v = $('#pipName').value.trim(); if (v) this.pkgInstall(v.split(/[<>=!~ ]/)[0], act); }
       else if (a === 'tpl') this.useTemplate(act.dataset.id);
+      else if (a === 'ext-toggle') { ExtensionManager.toggle(act.dataset.id); this.renderExtensions(); }
       return;
     }
     const more = t.closest('.more');
@@ -177,6 +211,7 @@ const UI = {
       else toast('Binary file: cannot edit');
       return;
     }
+    this.setScreen('editor');
     Ed.open(p);
     this.renderFiles();
     if (this.phone()) this.setView('code'); else if (innerWidth < 900) this.toggleSidebar(false);
@@ -260,6 +295,11 @@ const UI = {
     $('#sbBody').innerHTML = '<div class="hint">Start a new project from a template. Each one is created in its own folder.</div>' +
       TEMPLATES.map(t => `<button class="tpl" data-act="tpl" data-id="${t.id}"><b><span class="em">${t.emoji}</span>${esc(t.name)}</b><span>${esc(t.desc)}</span></button>`).join('');
   },
+  renderExtensions() {
+    const body = $('#sbBody');
+    body.innerHTML = '<div class="hint">Small tools that add real file actions to the editor. Enable or disable each extension independently.</div>' +
+      ExtensionManager.catalog.map(x => `<div class="extension-row"><div class="extension-top"><span class="extension-badge">${esc(x.badge)}</span><label class="extension-switch"><input type="checkbox" data-act="ext-toggle" data-id="${esc(x.id)}" ${ExtensionManager.enabled(x.id) ? 'checked' : ''}><i></i></label></div><b>${esc(x.name)}</b><p>${esc(x.description)}</p><small>${esc(x.types)}</small></div>`).join('');
+  },
   async useTemplate(id) {
     const t = TEMPLATES.find(x => x.id === id); if (!t) return;
     const main = await instantiateTemplate(t);
@@ -319,74 +359,4 @@ const UI = {
   }
 };
 
-/* ═════════ Discord simulator panel ═════════ */
-const Disc = {
-  users: {}, msgs: {}, cur: 'general', sub: null, ready: false,
-  init() {
-    $('#dcForm').addEventListener('submit', async e => {
-      e.preventDefault();
-      const inp = $('#dcIn'), t = inp.value.trim(); if (!t) return;
-      if (!this.ready) { toast('Run a bot first (bot.run(TOKEN))'); return; }
-      inp.value = '';
-      try { const m = Py.py.pyimport('discord'); m._sim_input(t, this.cur); m.destroy(); } catch (err) { Con.err(String(err)); }
-    });
-    $('#dcChan').addEventListener('change', e => { this.cur = e.target.value.replace('#', ''); $('#dcIn').placeholder = 'Message #' + this.cur; this.render(); });
-    this.render();
-  },
-  md(text) {
-    let s = esc(text || '');
-    s = s.replace(/&lt;@!?(\d+)&gt;/g, (m, id) => '<span class="mention">@' + esc(this.users[id] || 'unknown') + '</span>')
-      .replace(/&lt;#(\d+)&gt;/g, '<span class="mention">#channel</span>')
-      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>').replace(/(^|[^*])\*(?!\*)(.+?)\*/g, '$1<i>$2</i>').replace(/`([^`]+)`/g, '<code>$1</code>');
-    return s;
-  },
-  handle(d) {
-    if (d.type === 'ready') {
-      this.ready = true; this.msgs = {}; this.users = { [d.bot.id]: d.bot.name, [d.you.id]: d.you.name };
-      d.channels.forEach(c => this.msgs[c] = []);
-      $('#dcChan').innerHTML = d.channels.map(c => `<option ${c === this.cur ? 'selected' : ''}>#${esc(c)}</option>`).join('');
-      if (!d.channels.includes(this.cur)) this.cur = d.channels[0];
-      $('#dcTitle').textContent = d.bot.name; this.setSub('online · simulator');
-      this.msgs[this.cur].push({ sys: true, text: d.bot.name + ' connected to PyPad Server (local simulator, not real Discord)' });
-      this.render();
-    } else if (d.type === 'message') {
-      (this.msgs[d.channel] = this.msgs[d.channel] || []).push(d);
-      if (d.channel !== this.cur) toast('New message in #' + d.channel); this.render();
-      UI.badge('disc');
-    } else if (d.type === 'edit' || d.type === 'reaction' || d.type === 'delete') {
-      for (const list of Object.values(this.msgs)) {
-        const i = list.findIndex(m => m.id === d.id); if (i < 0) continue;
-        if (d.type === 'edit') { list[i].content = d.content; list[i].embeds = d.embeds; list[i].edited = true; }
-        else if (d.type === 'reaction') (list[i].reactions = list[i].reactions || []).push(d.emoji);
-        else list.splice(i, 1);
-      }
-      this.render();
-    } else if (d.type === 'typing') { this.setSub('typing…'); clearTimeout(this._tt); this._tt = setTimeout(() => this.setSub('online · simulator'), 1500); }
-    else if (d.type === 'sys') { (this.msgs[this.cur] = this.msgs[this.cur] || []).push({ sys: true, text: d.text }); this.render(); }
-    else if (d.type === 'presence') this.setSub(d.text ? 'Playing ' + d.text : 'online · simulator');
-  },
-  setSub(t) { $('#dcSub').textContent = t; },
-  embed(e) {
-    const color = e.color || '#5865f2';
-    return `<div class="emb" style="--c:${esc(color)}">${e.author ? `<small>${esc(e.author.name)}</small>` : ''}${e.title ? `<h4>${this.md(e.title)}</h4>` : ''}${e.description ? `<p>${this.md(e.description)}</p>` : ''}
-      ${e.fields && e.fields.length ? `<div class="fs">${e.fields.map(f => `<div class="f" ${f.inline ? '' : 'style="flex-basis:100%"'}><b>${this.md(f.name)}</b><span>${this.md(f.value)}</span></div>`).join('')}</div>` : ''}
-      ${e.footer ? `<small>${esc(e.footer.text || '')}</small>` : ''}</div>`;
-  },
-  render() {
-    const box = $('#dcMsgs'), near = box.scrollHeight - box.scrollTop - box.clientHeight < 120;
-    const list = this.msgs[this.cur] || [];
-    if (!this.ready) { box.innerHTML = '<div class="dsys">No bot running. Open <b>bot.py</b> and press Run.<br>Then chat here: try <code>!ping</code>, <code>!roll 20</code>, <code>!help</code> or <code>/hello</code>.</div>'; return; }
-    box.innerHTML = list.map(m => {
-      if (m.sys) return `<div class="dsys">${esc(m.text)}</div>`;
-      const bot = m.author.bot;
-      const reply = m.reply ? (() => { const r = list.find(x => x.id === m.reply); return r ? `<div style="color:var(--dim);font-size:12px">↪ ${esc(r.author.name)}: ${esc((r.content || '').slice(0, 50))}</div>` : ''; })() : '';
-      return `<div class="dm ${bot ? 'bot' : ''}"><div class="av">${esc(m.author.name[0] || '?')}</div><div style="min-width:0">${reply}<div class="nm">${esc(m.author.name)}${bot ? '<em>BOT</em>' : ''}</div>
-        ${m.content ? `<div class="tx">${this.md(m.content)}${m.edited ? ' <small style="color:var(--dim)">(edited)</small>' : ''}</div>` : ''}${(m.embeds || []).map(e => this.embed(e)).join('')}
-        ${m.ephemeral ? '<small style="color:var(--dim)">Only you can see this</small>' : ''}${(m.reactions || []).map(r => `<span class="rx">${esc(r)} 1</span>`).join(' ')}</div></div>`;
-    }).join('');
-    if (near) box.scrollTop = box.scrollHeight;
-  }
-};
-PyPad.discordReady = () => { UI.showOut('disc'); };
-PyPad.discordMsg = s => { try { Disc.handle(JSON.parse(s)); } catch (e) { console.error(e); } };
 PyPad.pyImage = b64 => Con.image('data:image/png;base64,' + b64);
