@@ -146,7 +146,7 @@ const Py = {
     const dist = PY_ALIAS[name] || name;
     if (!this.pipInstalled.has(dist)) { Con.warn('Only packages installed from PyPI can be removed here.'); return false; }
     try {
-      await this.py.runPythonAsync('import micropip\nawait micropip.uninstall(' + JSON.stringify(dist) + ')');
+      this.py.runPython('import micropip\nmicropip.uninstall(' + JSON.stringify(dist) + ')');
       this.pipInstalled.delete(dist);
       Con.ok('Removed ' + dist);
       UI.refreshPkgs && UI.refreshPkgs();
