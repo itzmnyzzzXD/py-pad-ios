@@ -14,7 +14,7 @@ tar -xjf "$ARCHIVE" -C Web/vendor
 for file in pyodide.js pyodide.asm.js pyodide.asm.wasm python_stdlib.zip pyodide-lock.json; do
   test -s "$DEST/$file" || { echo "Missing required Pyodide file: $DEST/$file" >&2; exit 1; }
 done
-find "$DEST" -maxdepth 1 -type f -name '*.whl' | grep -q . || { echo "No bundled wheels found" >&2; exit 1; }
+find "$DEST" -maxdepth 1 -type f -name '*.whl' -print -quit | grep -q . || { echo "No bundled wheels found" >&2; exit 1; }
 SIZE_KB="$(du -sk "$DEST" | awk '{print $1}')"
 if (( SIZE_KB < 100000 )); then echo "Pyodide distribution unexpectedly small ($SIZE_KB KB)" >&2; exit 1; fi
 echo "Verified Pyodide $VERSION bundle: $(du -sh "$DEST" | cut -f1)"

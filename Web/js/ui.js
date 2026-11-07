@@ -224,7 +224,7 @@ const UI = {
       items.push({ label: 'New file here', icon: 'plus', run: () => this.newFile(p) }, { label: 'New folder here', icon: 'folder', run: () => this.newFolder(p) }, { label: 'Import here', icon: 'upload', run: () => this.importFiles(p) });
     } else {
       items.push({ label: 'Open', icon: 'file', run: () => this.openFile(p) });
-      if (['py', 'js', 'html', 'htm', 'css'].includes(Path.ext(p))) items.push({ label: 'Run', icon: 'play', run: () => { this.openFile(p); Run.file(p); } });
+      if (['py', 'js', 'html', 'htm', 'css', 'md', 'markdown', 'json', 'csv'].includes(Path.ext(p))) items.push({ label: 'Run', icon: 'play', run: () => { this.openFile(p); Run.file(p); } });
       items.push({ label: 'Duplicate', icon: 'copy', run: async () => { const n = WS.uniquePath(p); await WS.create(n, WS.files[p]); } },
         { label: 'Share / export', icon: 'download', run: () => this.shareFile(p) });
     }

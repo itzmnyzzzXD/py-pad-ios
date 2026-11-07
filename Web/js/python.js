@@ -50,7 +50,7 @@ const Py = {
     py.setStdin({ stdin: () => null });
     try { await py.loadPackage('micropip', { messageCallback: () => {}, errorCallback: () => {} }); } catch (e) { Con.warn('Package installer unavailable: ' + e.message); }
     try { await py.loadPackage('pyodide-http', { messageCallback: () => {}, errorCallback: () => {} }); } catch (e) { Con.warn('HTTP compatibility helper unavailable; browser network restrictions still apply.'); }
-    py.FS.mkdirTree(RT_ROOT + '/discord/ext'); py.FS.mkdirTree(WS_ROOT);
+    py.FS.mkdirTree(WS_ROOT);
     for (const f of PY_FILES) {
       const r = await fetch('py/' + f); if (!r.ok) throw new Error('Missing runtime file ' + f);
       py.FS.writeFile(RT_ROOT + '/' + f, await r.text());
@@ -125,7 +125,7 @@ const Py = {
     await this.init();
     const dist = PY_ALIAS[spec] || spec;
     if (this.isLoaded(dist)) return true;
-    if (dist === 'flask' || dist === 'discord') return true;
+    if (dist === 'flask') return true;
     Con.info((auto ? 'Auto-installing ' : 'Installing ') + dist + '…');
     try { await this.py.loadPackage(dist, { messageCallback: () => {}, errorCallback: () => {} }); } catch (e) {}
     if (this.isLoaded(dist)) { Con.ok('✓ ' + dist + ' (bundled build)'); UI.refreshPkgs && UI.refreshPkgs(); return true; }

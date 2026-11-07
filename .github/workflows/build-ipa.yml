@@ -70,7 +70,7 @@ jobs:
           done
           SIZE_KB="$(du -sk "$RUNTIME" | awk '{print $1}')"
           test "$SIZE_KB" -gt 100000
-          find "$RUNTIME" -maxdepth 1 -type f -name '*.whl' | grep -q .
+          find "$RUNTIME" -maxdepth 1 -type f -name '*.whl' -print -quit | grep -q .
           echo "Embedded Python size: $(du -sh "$RUNTIME" | cut -f1)"
 
       - name: Package and validate unsigned IPA
@@ -83,8 +83,9 @@ jobs:
           cp -R "$APP" Payload/
           /usr/bin/zip -qry PyPad.ipa Payload
           /usr/bin/zip -T PyPad.ipa
-          unzip -l PyPad.ipa | grep -q 'Payload/PyPad.app/Web/vendor/pyodide/pyodide.asm.wasm'
-          unzip -l PyPad.ipa | grep -q 'Payload/PyPad.app/Web/vendor/pyodide/pyodide-lock.json'
+          unzip -Z1 PyPad.ipa > "$RUNNER_TEMP/ipa-files.txt"
+          grep -Fq 'Payload/PyPad.app/Web/vendor/pyodide/pyodide.asm.wasm' "$RUNNER_TEMP/ipa-files.txt"
+          grep -Fq 'Payload/PyPad.app/Web/vendor/pyodide/pyodide-lock.json' "$RUNNER_TEMP/ipa-files.txt"
           test -s PyPad.ipa
           ls -lh PyPad.ipa
 
