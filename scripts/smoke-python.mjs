@@ -1,18 +1,24 @@
 import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 
-const runtimeDir = path.resolve("Web/vendor/pyodide");
-const runtimeUrl = pathToFileURL(runtimeDir + path.sep).href;
-const { loadPyodide } = await import(pathToFileURL(path.join(runtimeDir, "pyodide.mjs")).href);
+const modulePath = process.env.PYPAD_PYODIDE_MODULE;
+if (!modulePath || !existsSync(modulePath)) {
+  throw new Error("Pinned Pyodide Node module was not installed: " + String(modulePath));
+}
 
+const { loadPyodide } = await import(pathToFileURL(modulePath).href);
 const output = [];
 const errors = [];
 const pyodide = await loadPyodide({
-  indexURL: runtimeUrl,
   stdout: (line) => output.push(String(line)),
   stderr: (line) => errors.push(String(line)),
 });
+
+if (!String(pyodide.version).startsWith("0.26.4")) {
+  throw new Error("Smoke test loaded unexpected Pyodide version: " + pyodide.version);
+}
 
 const helperPath = "/home/pyodide/_pypad";
 const workspacePath = "/home/pyodide/ws";
@@ -46,4 +52,4 @@ if (!joined.includes("script: 42")) throw new Error("Python file execution outpu
 if (!joined.includes("repl: 42")) throw new Error("Python REPL output was missing. Output: " + joined);
 if (errors.length) console.warn("Python smoke-test stderr:", errors.join("\n"));
 
-console.log("PyPad Python smoke test passed: bundled Pyodide loaded, local module imported, script executed, and REPL executed.");
+console.log("PyPad Python smoke test passed: Pyodide 0.26.4 loaded, local module imported, script executed, and REPL executed.");

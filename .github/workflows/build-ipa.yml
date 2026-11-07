@@ -38,8 +38,14 @@ jobs:
         shell: bash
         run: bash scripts/check-source.sh
 
-      - name: Smoke-test bundled Python runtime
+      - name: Install pinned Node smoke-test runtime
         shell: bash
+        run: npm install --prefix "$RUNNER_TEMP/pypad-node-smoke" --no-save pyodide@0.26.4
+
+      - name: Smoke-test Python runtime and REPL
+        shell: bash
+        env:
+          PYPAD_PYODIDE_MODULE: ${{ runner.temp }}/pypad-node-smoke/node_modules/pyodide/pyodide.mjs
         run: node scripts/smoke-python.mjs
 
       - name: Install XcodeGen
