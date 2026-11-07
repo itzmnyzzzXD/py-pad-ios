@@ -34,6 +34,10 @@ jobs:
         shell: bash
         run: bash scripts/vendor-pyodide.sh
 
+      - name: Run source and IDE regression checks
+        shell: bash
+        run: bash scripts/check-source.sh
+
       - name: Install XcodeGen
         shell: bash
         run: brew install xcodegen

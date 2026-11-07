@@ -29,7 +29,7 @@ const PKG_CATALOG = [
 ];
 
 const Py = {
-  py: null, ready: false, loading: null, running: false, syncedVer: -1, mt: {},
+  py: null, ready: false, loading: null, running: false, syncedVer: -1, mt: {}, pipInstalled: new Set(),
 
   async init() {
     if (this.ready) return;
@@ -51,6 +51,7 @@ const Py = {
     try { await py.loadPackage('micropip', { messageCallback: () => {}, errorCallback: () => {} }); } catch (e) { Con.warn('Package installer unavailable: ' + e.message); }
     try { await py.loadPackage('pyodide-http', { messageCallback: () => {}, errorCallback: () => {} }); } catch (e) { Con.warn('HTTP compatibility helper unavailable; browser network restrictions still apply.'); }
     py.FS.mkdirTree(WS_ROOT);
+    py.FS.mkdirTree(RT_ROOT);
     for (const f of PY_FILES) {
       const r = await fetch('py/' + f); if (!r.ok) throw new Error('Missing runtime file ' + f);
       py.FS.writeFile(RT_ROOT + '/' + f, await r.text());
@@ -119,6 +120,7 @@ const Py = {
     const norm = s => s.toLowerCase().replace(/[-_.]+/g, '-');
     if (dist === 'flask') return true;
     if (!this.py) return false;
+    if ([...(this.pipInstalled || [])].some(k => norm(k) === norm(dist))) return true;
     return Object.keys(this.py.loadedPackages).some(k => norm(k) === norm(dist));
   },
   async install(spec, auto) {
@@ -141,17 +143,33 @@ const Py = {
   },
   async uninstall(name) {
     await this.init();
-    try { await this.py.runPythonAsync('import micropip\nmicropip.uninstall(' + JSON.stringify(name) + ')'); Con.ok('Removed ' + name); }
-    catch (e) { Con.err(String(e.message || e).split('\n').pop()); }
+    const dist = PY_ALIAS[name] || name;
+    if (!this.pipInstalled.has(dist)) { Con.warn('Only packages installed from PyPI can be removed here.'); return false; }
+    try {
+      await this.py.runPythonAsync('import micropip\nawait micropip.uninstall(' + JSON.stringify(dist) + ')');
+      this.pipInstalled.delete(dist);
+      Con.ok('Removed ' + dist);
+      UI.refreshPkgs && UI.refreshPkgs();
+      return true;
+    } catch (e) { Con.err(String(e.message || e).split('\n').pop()); return false; }
   },
   async listInstalled() {
     await this.init();
-    return Object.keys(this.py.loadedPackages).sort();
+    return [...new Set([...Object.keys(this.py.loadedPackages), ...this.pipInstalled])].sort();
   },
   async preload(code) {
     const py = this.py;
-    if (/\bflask\b/.test(code)) await py.loadPackage('jinja2', { messageCallback: () => {}, errorCallback: () => {} });
-    await py.loadPackagesFromImports(code, { messageCallback: m => Con.info(m), errorCallback: m => Con.err(m) });
+    if (/\bflask\b/.test(code)) {
+      try { await py.loadPackage('jinja2', { messageCallback: () => {}, errorCallback: () => {} }); }
+      catch (e) { Con.warn('Flask template support could not preload jinja2: ' + (e.message || e)); }
+    }
+    try {
+      await py.loadPackagesFromImports(code, { messageCallback: m => Con.info(m), errorCallback: m => Con.err(m) });
+    } catch (e) {
+      // Do not abort a run just because automatic preload could not resolve an import.
+      // run_code() reports ModuleNotFoundError and the auto-installer handles it.
+      Con.warn('Automatic package preload skipped: ' + (e.message || e));
+    }
   },
 
   /* ── running a file ── */
